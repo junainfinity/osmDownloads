@@ -41,6 +41,16 @@ struct HistoryView: View {
             default: return false
             }
         }
+        .filter(matchesSourceFilter)
+    }
+
+    private func matchesSourceFilter(_ job: Job) -> Bool {
+        switch appVM.sourceFilter {
+        case .all:         return true
+        case .huggingFace: return job.source == .huggingFace
+        case .github:      return job.source == .github
+        case .generic:     return job.source == .generic
+        }
     }
 
     private var filteredJobs: [Job] {

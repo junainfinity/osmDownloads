@@ -25,9 +25,10 @@ struct Sidebar: View {
                 .padding(.bottom, 6)
 
             VStack(alignment: .leading, spacing: 2) {
-                SourceRow(label: "Hugging Face", glyph: .huggingFace, count: count(for: .huggingFace))
-                SourceRow(label: "GitHub",       glyph: .github,      count: count(for: .github))
-                SourceRow(label: "Other URLs",   glyph: .generic,     count: count(for: .generic))
+                SourceRow(label: "All sources",  filter: .all,         count: allJobs.count, glyph: nil)
+                SourceRow(label: "Hugging Face", filter: .huggingFace, count: count(for: .huggingFace), glyph: .huggingFace)
+                SourceRow(label: "GitHub",       filter: .github,      count: count(for: .github),      glyph: .github)
+                SourceRow(label: "Other URLs",   filter: .generic,     count: count(for: .generic),     glyph: .generic)
             }
             .padding(.horizontal, 8)
 
@@ -135,25 +136,46 @@ private struct SectionTitle: View {
 
 private struct SourceRow: View {
     let label: String
-    let glyph: Source
+    let filter: SourceFilter
     let count: Int
+    let glyph: Source?
+
+    @Environment(AppViewModel.self) private var appVM
 
     var body: some View {
-        HStack(spacing: 9) {
-            SourceIcon(source: glyph, size: 14)
-                .frame(width: 14, height: 14)
-            Text(label)
-                .font(.system(size: 13))
-                .foregroundStyle(Theme.text2)
-            Spacer(minLength: 0)
-            if count > 0 {
-                Text("\(count)")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Theme.text3)
+        let active = appVM.sourceFilter == filter
+        Button {
+            // Toggle: clicking the active filter resets to .all.
+            appVM.sourceFilter = (active && filter != .all) ? .all : filter
+        } label: {
+            HStack(spacing: 9) {
+                if let glyph {
+                    SourceIcon(source: glyph, size: 14)
+                        .frame(width: 14, height: 14)
+                } else {
+                    Icon(icon: .download, size: 12, color: active ? Theme.text : Theme.text3)
+                        .frame(width: 14, height: 14)
+                }
+                Text(label)
+                    .font(.system(size: 13, weight: active ? .semibold : .regular))
+                    .foregroundStyle(active ? Theme.text : Theme.text2)
+                Spacer(minLength: 0)
+                if count > 0 {
+                    Text("\(count)")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(active ? Theme.text2 : Theme.text3)
+                }
             }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(active ? Theme.surface : Color.clear)
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.radiusSm, style: .continuous)
+                    .stroke(active ? Theme.border : Color.clear, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSm, style: .continuous))
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .buttonStyle(.borderless)
     }
 }
 

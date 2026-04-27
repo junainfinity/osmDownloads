@@ -18,9 +18,19 @@ struct HistoryRow: View {
                 HStack(spacing: 8) {
                     Text(job.title)
                         .font(.system(size: 13.5, weight: .semibold))
-                        .foregroundStyle(Theme.text)
+                        .foregroundStyle(missing ? Theme.text3 : Theme.text)
+                        .strikethrough(missing, color: Theme.text3)
                         .lineLimit(1)
                     StatusPill(status: job.status)
+                    if missing {
+                        Text("Files moved")
+                            .font(.system(size: 10.5, weight: .medium))
+                            .foregroundStyle(Theme.text3)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 1)
+                            .background(Theme.surface3)
+                            .clipShape(Capsule())
+                    }
                     Spacer(minLength: 0)
                 }
                 HStack(spacing: 6) {
@@ -44,15 +54,14 @@ struct HistoryRow: View {
             Spacer(minLength: 6)
 
             HStack(spacing: 6) {
-                if job.status == .completed {
+                if job.status == .completed && !missing {
                     Button("Reveal") {
                         FileSystemService.revealFolder(job.destinationFolder)
                     }
                     .buttonStyle(GhostButtonStyle(compact: true))
-                    .disabled(!fileExists)
                 }
-                if job.status == .failed || job.status == .canceled {
-                    Button("Retry") {
+                if job.status == .failed || job.status == .canceled || missing {
+                    Button(missing ? "Re-download" : "Retry") {
                         jobs.retry(job)
                     }
                     .buttonStyle(GhostButtonStyle(compact: true))
@@ -74,8 +83,26 @@ struct HistoryRow: View {
                 .stroke(Theme.border, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous))
-        .onAppear {
-            fileExists = FileSystemService.fileExists(at: job.destinationFolder)
+        .opacity(missing ? 0.78 : 1)
+        .onAppear { recheckExistence() }
+    }
+
+    /// Only completed jobs can be "missing" — failed/canceled never had files.
+    private var missing: Bool {
+        job.status == .completed && !fileExists
+    }
+
+    private func recheckExistence() {
+        let folderOK = FileSystemService.fileExists(at: job.destinationFolder)
+        if !folderOK {
+            fileExists = false
+            return
         }
+        // Folder exists; verify at least one of the recorded files is still on disk.
+        if job.files.isEmpty {
+            fileExists = true
+            return
+        }
+        fileExists = job.files.contains { FileSystemService.fileExists(at: $0.localURL) }
     }
 }

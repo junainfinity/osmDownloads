@@ -67,7 +67,7 @@ private struct Titlebar: View {
             } label: {
                 Icon(icon: .settings, size: 15, color: Theme.text2)
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(IconButtonStyle())
             .help("Settings")
             .keyboardShortcut(",", modifiers: .command)
         }

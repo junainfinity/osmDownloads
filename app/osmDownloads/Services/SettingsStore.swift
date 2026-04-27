@@ -23,6 +23,10 @@ final class SettingsStore: @unchecked Sendable {
     var connectionTimeoutSeconds: Double {
         didSet { UserDefaults.standard.set(connectionTimeoutSeconds, forKey: "connectionTimeoutSeconds") }
     }
+    /// Max aggregate download speed in Mbps. 0 = unlimited.
+    var maxDownloadMbps: Double {
+        didSet { UserDefaults.standard.set(maxDownloadMbps, forKey: "maxDownloadMbps") }
+    }
     var autoClearHistoryDays: Int {
         didSet { UserDefaults.standard.set(autoClearHistoryDays, forKey: "autoClearHistoryDays") }
     }
@@ -50,6 +54,7 @@ final class SettingsStore: @unchecked Sendable {
         self.retryCount               = d.object(forKey: "retryCount") as? Int ?? 3
         self.retryBackoffSeconds      = d.object(forKey: "retryBackoffSeconds") as? Double ?? 2.0
         self.connectionTimeoutSeconds = d.object(forKey: "connectionTimeoutSeconds") as? Double ?? 30
+        self.maxDownloadMbps          = d.object(forKey: "maxDownloadMbps") as? Double ?? 0
         self.autoClearHistoryDays     = d.object(forKey: "autoClearHistoryDays") as? Int ?? 0
         self.resumeIncompleteOnLaunch = d.object(forKey: "resumeIncompleteOnLaunch") as? Bool ?? true
         let themeRaw  = d.string(forKey: "themePreference") ?? ThemePreference.system.rawValue

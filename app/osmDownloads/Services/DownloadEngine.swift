@@ -18,6 +18,11 @@ final class DownloadEngine: NSObject, URLSessionDownloadDelegate, @unchecked Sen
     /// cancel-with-resume-data completion handler emit `.filePaused`).
     private var stopRequested: Set<UUID> = []
     private var session: URLSession!
+    /// Sliding 1s window of (timestamp, bytesWritten) used to enforce the Mbps
+    /// cap by sleeping the delegate queue. Only touched from the serial
+    /// delegate queue, so no lock needed.
+    private var throttleWindow: [(Date, Int64)] = []
+    private var throttleWindowSum: Int64 = 0
 
     init(configuration: URLSessionConfiguration = .defaultEngine()) {
         var cont: AsyncStream<DownloadEvent>.Continuation!
@@ -112,8 +117,38 @@ final class DownloadEngine: NSObject, URLSessionDownloadDelegate, @unchecked Sen
                     totalBytesWritten: Int64,
                     totalBytesExpectedToWrite: Int64) {
         guard let id = UUID(uuidString: downloadTask.taskDescription ?? "") else { return }
+        applyThrottleIfNeeded(bytesWritten: bytesWritten)
         let total: Int64? = totalBytesExpectedToWrite > 0 ? totalBytesExpectedToWrite : nil
         continuation.yield(.bytesReceived(fileID: id, delta: totalBytesWritten, total: total))
+    }
+
+    /// Sleep on the (serial) delegate queue when the rolling 1-second
+    /// aggregate exceeds the Mbps cap. URLSession buffers some data, so this is
+    /// best-effort — the sustained rate tracks the limit but bursts can briefly
+    /// exceed it.
+    private func applyThrottleIfNeeded(bytesWritten: Int64) {
+        let limitMbps = SettingsStore.shared.maxDownloadMbps
+        guard limitMbps > 0 else {
+            // Cap at zero only when unlimited; otherwise let it grow during throttling.
+            if !throttleWindow.isEmpty { throttleWindow.removeAll(); throttleWindowSum = 0 }
+            return
+        }
+        let now = Date()
+        throttleWindow.append((now, bytesWritten))
+        throttleWindowSum += bytesWritten
+        let cutoff = now.addingTimeInterval(-1.0)
+        while let first = throttleWindow.first, first.0 < cutoff {
+            throttleWindowSum -= first.1
+            throttleWindow.removeFirst()
+        }
+        // 1 Mbps = 1_000_000 bits/sec = 125_000 bytes/sec.
+        let limitBps = limitMbps * 125_000
+        let observed = Double(throttleWindowSum)
+        if observed > limitBps {
+            let excessRatio = (observed - limitBps) / limitBps
+            let sleepSec = min(0.4, max(0.01, excessRatio))
+            Thread.sleep(forTimeInterval: sleepSec)
+        }
     }
 
     func urlSession(_ session: URLSession,

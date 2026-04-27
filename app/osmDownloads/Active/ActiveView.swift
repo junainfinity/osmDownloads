@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ActiveView: View {
     @Environment(JobsViewModel.self) private var jobs
+    @Environment(AppViewModel.self) private var appVM
     @Environment(\.modelContext) private var context
 
     @State private var resolveVM = ResolveViewModel()
@@ -42,6 +43,16 @@ struct ActiveView: View {
             case .downloading, .resolving, .paused, .queued: return true
             default: return false
             }
+        }
+        .filter(matchesSourceFilter)
+    }
+
+    private func matchesSourceFilter(_ job: Job) -> Bool {
+        switch appVM.sourceFilter {
+        case .all:         return true
+        case .huggingFace: return job.source == .huggingFace
+        case .github:      return job.source == .github
+        case .generic:     return job.source == .generic
         }
     }
 

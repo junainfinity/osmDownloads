@@ -5,19 +5,26 @@ struct SettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(SettingsStore.self) private var settings
 
+    // Draft state — changes are uncommitted until Save.
+    @State private var theme: ThemePreference = .system
+    @State private var maxFilesPerJob: Int = 4
+    @State private var maxJobs: Int = 3
+    @State private var maxMbpsString: String = ""
+    @State private var destinationPath: String = ""
     @State private var hfToken: String = ""
-    @State private var hfTokenLoaded: Bool = false
-    @State private var savedFlash: Bool = false
-    @State private var saveFlashTask: Task<Void, Never>?
+
+    @State private var loaded: Bool = false
+    @State private var saveButtonState: SaveButtonState = .save
+
+    enum SaveButtonState { case save, done }
 
     var body: some View {
-        @Bindable var settings = settings
         VStack(spacing: 0) {
             header
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
-                    AppearanceSection()
-                    DownloadsSection()
+                    appearanceSection
+                    downloadsSection
                     huggingFaceSection
                 }
                 .padding(.horizontal, 22)
@@ -25,15 +32,18 @@ struct SettingsSheet: View {
             }
             footer
         }
-        .frame(width: 520, height: 560)
+        .frame(width: 540, height: 620)
         .background(Theme.surface)
-        .onAppear {
-            if !hfTokenLoaded {
-                hfToken = KeychainService.get(.huggingFace) ?? ""
-                hfTokenLoaded = true
-            }
-        }
+        .onAppear { if !loaded { loadFromStore() } }
+        .onChange(of: theme)             { saveButtonState = .save }
+        .onChange(of: maxFilesPerJob)    { saveButtonState = .save }
+        .onChange(of: maxJobs)           { saveButtonState = .save }
+        .onChange(of: maxMbpsString)     { saveButtonState = .save }
+        .onChange(of: destinationPath)   { saveButtonState = .save }
+        .onChange(of: hfToken)           { saveButtonState = .save }
     }
+
+    // MARK: - Header / footer
 
     private var header: some View {
         HStack {
@@ -41,12 +51,6 @@ struct SettingsSheet: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Theme.text)
             Spacer()
-            Button { dismiss() } label: {
-                Icon(icon: .stop, size: 12, color: Theme.text3)
-                    .frame(width: 28, height: 28)
-            }
-            .buttonStyle(.borderless)
-            .help("Close")
         }
         .padding(.horizontal, 22)
         .padding(.vertical, 14)
@@ -55,10 +59,22 @@ struct SettingsSheet: View {
     }
 
     private var footer: some View {
-        HStack {
+        HStack(spacing: 8) {
             Spacer()
-            Button("Done") { dismiss() }
-                .buttonStyle(PrimaryButtonStyle())
+            Button("Cancel", action: cancel)
+                .buttonStyle(GhostButtonStyle())
+                .keyboardShortcut(.cancelAction)
+
+            Button(action: saveOrDismiss) {
+                HStack(spacing: 6) {
+                    if saveButtonState == .done {
+                        Icon(icon: .checkOn, size: 11, color: Theme.accentInk)
+                    }
+                    Text(saveButtonState == .save ? "Save" : "Done")
+                }
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            .keyboardShortcut(.defaultAction)
         }
         .padding(.horizontal, 22)
         .padding(.vertical, 12)
@@ -66,112 +82,18 @@ struct SettingsSheet: View {
         .overlay(Divider().background(Theme.border), alignment: .top)
     }
 
-    private var huggingFaceSection: some View {
+    // MARK: - Sections
+
+    private var appearanceSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionTitle("Hugging Face")
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Access token (for gated repos and higher rate limits)")
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(Theme.text2)
-
-                HStack(spacing: 8) {
-                    SecureField("hf_…", text: $hfToken)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 12.5, design: .monospaced))
-                        .foregroundStyle(Theme.text)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 6)
-                        .background(Theme.surface2)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .stroke(Theme.border, lineWidth: 1)
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-
-                    Button("Save") { saveToken() }
-                        .buttonStyle(PrimaryButtonStyle())
-                        .disabled(hfToken.trimmingCharacters(in: .whitespaces).isEmpty)
-                    Button("Clear") { clearToken() }
-                        .buttonStyle(GhostButtonStyle(compact: true))
-                        .disabled(hfToken.isEmpty)
-                }
-
-                HStack(spacing: 8) {
-                    if savedFlash {
-                        HStack(spacing: 5) {
-                            Icon(icon: .checkOn, size: 11, color: Theme.success)
-                            Text("Saved to Keychain")
-                                .font(.system(size: 11.5, weight: .medium))
-                                .foregroundStyle(Theme.success)
-                        }
-                    }
-                    Spacer()
-                    Link("Get a token →",
-                         destination: URL(string: "https://huggingface.co/settings/tokens")!)
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(Theme.info)
-                }
-
-                Text("Tokens are stored in macOS Keychain — never on disk in plain text. Required for Pro / gated repos and recommended for everyone to avoid anonymous rate limits.")
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(Theme.text3)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    private func saveToken() {
-        let trimmed = hfToken.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return }
-        KeychainService.set(trimmed, account: .huggingFace)
-        flashSaved()
-    }
-
-    private func clearToken() {
-        KeychainService.delete(.huggingFace)
-        hfToken = ""
-        flashSaved()
-    }
-
-    private func flashSaved() {
-        savedFlash = true
-        saveFlashTask?.cancel()
-        saveFlashTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1.6))
-            if !Task.isCancelled { savedFlash = false }
-        }
-    }
-}
-
-// MARK: - Subviews (each pulls SettingsStore from the environment)
-
-private struct SectionTitle: View {
-    let text: String
-    init(_ text: String) { self.text = text }
-    var body: some View {
-        Text(text.uppercased())
-            .font(.system(size: 10.5, weight: .semibold))
-            .tracking(0.08 * 10.5)
-            .foregroundStyle(Theme.text3)
-    }
-}
-
-private struct AppearanceSection: View {
-    @Environment(SettingsStore.self) private var settings
-
-    var body: some View {
-        @Bindable var settings = settings
-        VStack(alignment: .leading, spacing: 10) {
-            SectionTitle("Appearance")
+            sectionTitle("Appearance")
             HStack(spacing: 0) {
-                ForEach(ThemePreference.allCases, id: \.self) { theme in
-                    let active = settings.themePreference == theme
-                    Button {
-                        settings.themePreference = theme
-                    } label: {
+                ForEach(ThemePreference.allCases, id: \.self) { option in
+                    let active = theme == option
+                    Button { theme = option } label: {
                         HStack(spacing: 7) {
-                            themeIcon(for: theme, active: active)
-                            Text(theme.label)
+                            themeIcon(for: option, active: active)
+                            Text(option.label)
                                 .font(.system(size: 12.5, weight: active ? .semibold : .regular))
                                 .foregroundStyle(active ? Theme.text : Theme.text2)
                         }
@@ -194,102 +116,184 @@ private struct AppearanceSection: View {
     }
 
     @ViewBuilder
-    private func themeIcon(for theme: ThemePreference, active: Bool) -> some View {
+    private func themeIcon(for option: ThemePreference, active: Bool) -> some View {
         let color = active ? Theme.text : Theme.text3
-        switch theme {
+        switch option {
         case .system: Icon(icon: .settings, size: 12, color: color)
         case .light:  Icon(icon: .sun, size: 12, color: color)
         case .dark:   Icon(icon: .moon, size: 12, color: color)
         }
     }
-}
 
-private struct DownloadsSection: View {
-    @Environment(SettingsStore.self) private var settings
+    private var downloadsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            sectionTitle("Downloads")
 
-    var body: some View {
-        @Bindable var settings = settings
-        VStack(alignment: .leading, spacing: 14) {
-            SectionTitle("Downloads")
-
-            row(
+            stepperRow(
                 title: "Max simultaneous files per job",
-                hint: "Files within a job download in parallel up to this limit. Lower = slower but kinder to your network."
-            ) {
-                Stepper(value: $settings.maxConcurrentFilesPerJob, in: 1...12) {
-                    Text("\(settings.maxConcurrentFilesPerJob)")
-                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(Theme.text)
-                        .frame(width: 24, alignment: .trailing)
-                }
-                .labelsHidden()
-            }
+                hint: "Files within a job download in parallel up to this limit. Lower = slower but kinder to your network.",
+                value: $maxFilesPerJob,
+                range: 1...12
+            )
 
-            row(
+            stepperRow(
                 title: "Max simultaneous jobs",
-                hint: "How many separate downloads can run at once. Extra jobs wait in the Queue view."
-            ) {
-                Stepper(value: $settings.maxConcurrentJobs, in: 1...10) {
-                    Text("\(settings.maxConcurrentJobs)")
-                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(Theme.text)
-                        .frame(width: 24, alignment: .trailing)
-                }
-                .labelsHidden()
-            }
+                hint: "How many separate downloads can run at once. Extra jobs wait in the Queue view.",
+                value: $maxJobs,
+                range: 1...10
+            )
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Default destination folder")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Theme.text)
-                HStack(spacing: 8) {
-                    Text(prettyPath(settings.destinationFolderPath))
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundStyle(Theme.text2)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Theme.surface2)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .stroke(Theme.border, lineWidth: 1)
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    Button("Choose…") { chooseDefaultFolder() }
-                        .buttonStyle(GhostButtonStyle(compact: true))
-                    Button("Reset") {
-                        settings.destinationFolderPath = AppPaths.defaultDownloadsRoot.path
-                    }
-                    .buttonStyle(GhostButtonStyle(compact: true))
-                    .disabled(settings.destinationFolderPath == AppPaths.defaultDownloadsRoot.path)
-                }
-                Text("Files land in `<destination>/<slug-of-repo-name>/`.")
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(Theme.text3)
-            }
+            mbpsRow
+
+            destinationRow
         }
     }
 
-    private func row<Trailing: View>(
+    private func stepperRow(
         title: String,
         hint: String,
-        @ViewBuilder trailing: () -> Trailing
+        value: Binding<Int>,
+        range: ClosedRange<Int>
     ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
+            HStack(spacing: 10) {
                 Text(title)
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.text)
                 Spacer(minLength: 12)
-                trailing()
+                Text("\(value.wrappedValue)")
+                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Theme.text)
+                    .frame(minWidth: 28, alignment: .trailing)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Theme.surface2)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .stroke(Theme.border, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                Stepper("", value: value, in: range)
+                    .labelsHidden()
             }
             Text(hint)
                 .font(.system(size: 11.5))
                 .foregroundStyle(Theme.text3)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    private var mbpsRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 10) {
+                Text("Max download speed")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.text)
+                Spacer(minLength: 12)
+                TextField("Unlimited", text: $maxMbpsString)
+                    .textFieldStyle(.plain)
+                    .multilineTextAlignment(.trailing)
+                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Theme.text)
+                    .frame(width: 70)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Theme.surface2)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .stroke(Theme.border, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                Text("Mbps")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.text3)
+                    .frame(width: 36, alignment: .leading)
+            }
+            Text("Best-effort cap. Leave blank for unlimited. Values like 50 or 100 work; URLSession buffers a bit, so the sustained rate may briefly burst above the cap.")
+                .font(.system(size: 11.5))
+                .foregroundStyle(Theme.text3)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var destinationRow: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Default destination folder")
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.text)
+            HStack(spacing: 8) {
+                Text(prettyPath(destinationPath))
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(Theme.text2)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Theme.surface2)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(Theme.border, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                Button("Choose…") { chooseDefaultFolder() }
+                    .buttonStyle(GhostButtonStyle(compact: true))
+                Button("Reset") {
+                    destinationPath = AppPaths.defaultDownloadsRoot.path
+                }
+                .buttonStyle(GhostButtonStyle(compact: true))
+                .disabled(destinationPath == AppPaths.defaultDownloadsRoot.path)
+            }
+            Text("Files land in `<destination>/<slug-of-repo-name>/`.")
+                .font(.system(size: 11.5))
+                .foregroundStyle(Theme.text3)
+        }
+    }
+
+    private var huggingFaceSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle("Hugging Face")
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Access token (for gated repos and higher rate limits)")
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(Theme.text2)
+
+                SecureField("hf_…", text: $hfToken)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12.5, design: .monospaced))
+                    .foregroundStyle(Theme.text)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 7)
+                    .background(Theme.surface2)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(Theme.border, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+
+                HStack(spacing: 8) {
+                    Spacer()
+                    Link("Get a token →",
+                         destination: URL(string: "https://huggingface.co/settings/tokens")!)
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(Theme.info)
+                }
+
+                Text("Tokens are stored in macOS Keychain — never on disk in plain text. Required for Pro / gated repos and recommended for everyone to avoid anonymous rate limits.")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Theme.text3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func sectionTitle(_ s: String) -> some View {
+        Text(s.uppercased())
+            .font(.system(size: 10.5, weight: .semibold))
+            .tracking(0.08 * 10.5)
+            .foregroundStyle(Theme.text3)
     }
 
     private func prettyPath(_ path: String) -> String {
@@ -305,9 +309,62 @@ private struct DownloadsSection: View {
         panel.canCreateDirectories = true
         panel.title = "Choose default download destination"
         panel.prompt = "Choose"
-        panel.directoryURL = settings.destinationFolderURL
+        panel.directoryURL = URL(fileURLWithPath: destinationPath, isDirectory: true)
         if panel.runModal() == .OK, let url = panel.url {
-            settings.destinationFolderPath = url.path
+            destinationPath = url.path
         }
+    }
+
+    // MARK: - Load / save
+
+    private func loadFromStore() {
+        theme            = settings.themePreference
+        maxFilesPerJob   = settings.maxConcurrentFilesPerJob
+        maxJobs          = settings.maxConcurrentJobs
+        maxMbpsString    = settings.maxDownloadMbps > 0 ? Self.formatMbps(settings.maxDownloadMbps) : ""
+        destinationPath  = settings.destinationFolderPath
+        hfToken          = KeychainService.get(.huggingFace) ?? ""
+        loaded           = true
+        saveButtonState  = .save
+    }
+
+    private func cancel() {
+        dismiss()
+    }
+
+    private func saveOrDismiss() {
+        switch saveButtonState {
+        case .save:
+            applyDraft()
+            saveButtonState = .done
+        case .done:
+            dismiss()
+        }
+    }
+
+    private func applyDraft() {
+        settings.themePreference          = theme
+        settings.maxConcurrentFilesPerJob = maxFilesPerJob
+        settings.maxConcurrentJobs        = maxJobs
+        settings.maxDownloadMbps          = Self.parseMbps(maxMbpsString)
+        settings.destinationFolderPath    = destinationPath
+
+        let trimmedToken = hfToken.trimmingCharacters(in: .whitespaces)
+        if trimmedToken.isEmpty {
+            KeychainService.delete(.huggingFace)
+        } else {
+            KeychainService.set(trimmedToken, account: .huggingFace)
+        }
+    }
+
+    private static func parseMbps(_ s: String) -> Double {
+        let trimmed = s.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")
+        guard let v = Double(trimmed), v > 0 else { return 0 }
+        return v
+    }
+
+    private static func formatMbps(_ d: Double) -> String {
+        if d == d.rounded() { return "\(Int(d))" }
+        return String(format: "%.1f", d)
     }
 }

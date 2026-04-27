@@ -171,3 +171,18 @@ struct GhostButtonStyle: ButtonStyle {
             .clipShape(RoundedRectangle(cornerRadius: compact ? 6 : 7, style: .continuous))
     }
 }
+
+/// Icon-only button with proper press feedback (background fill + scale).
+struct IconButtonStyle: ButtonStyle {
+    var size: CGFloat = 30
+    var radius: CGFloat = 6
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .frame(width: size, height: size)
+            .background(configuration.isPressed ? Theme.surface3 : Color.clear)
+            .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .scaleEffect(configuration.isPressed ? 0.92 : 1.0)
+            .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
+    }
+}
