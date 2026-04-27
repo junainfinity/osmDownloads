@@ -1,0 +1,71 @@
+name: osmDownloads
+options:
+  bundleIdPrefix: app.osm
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_IDENTITY: "-"
+    ENABLE_HARDENED_RUNTIME: YES
+    GENERATE_INFOPLIST_FILE: YES
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: NO
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+
+targets:
+  osmDownloads:
+    type: application
+    platform: macOS
+    sources:
+      - path: osmDownloads
+        excludes:
+          - "**/.DS_Store"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.osm.downloads
+        INFOPLIST_KEY_CFBundleDisplayName: osmDownloads
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
+        INFOPLIST_KEY_NSHumanReadableCopyright: "© 2026 osmDownloads"
+        INFOPLIST_KEY_NSPrincipalClass: NSApplication
+        INFOPLIST_KEY_LSMinimumSystemVersion: "14.0"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_PREVIEWS: YES
+        SWIFT_EMIT_LOC_STRINGS: YES
+        COMBINE_HIDPI_IMAGES: YES
+
+  osmDownloadsTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: osmDownloadsTests
+    dependencies:
+      - target: osmDownloads
+    settings:
+      base:
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/osmDownloads.app/Contents/MacOS/osmDownloads"
+
+schemes:
+  osmDownloads:
+    build:
+      targets:
+        osmDownloads: all
+        osmDownloadsTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - osmDownloadsTests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

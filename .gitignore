@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Xcode
+app/build/
+**/xcuserdata/
+**/*.xcuserstate
+**/xcshareddata/WorkspaceSettings.xcsettings
+**/DerivedData/
+
+# Swift Package Manager
+.swiftpm/
+**/.build/
+Package.resolved
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*~
+
+# Misc
+.env
+*.log
