@@ -25,7 +25,7 @@ final class DownloadCoordinator {
         processingTask?.cancel()
     }
 
-    // MARK: - Public API
+    // MARK: - Public API (job-level)
 
     @discardableResult
     func enqueue(_ manifest: ResolvedManifest, selectedFileIDs: Set<UUID>, destination: URL) -> Job {
@@ -65,15 +65,32 @@ final class DownloadCoordinator {
     }
 
     func pauseJob(_ job: Job) {
-        for file in job.files where file.status == .downloading || file.status == .queued {
+        for file in job.files where file.status == .downloading {
             engine.pause(fileID: file.id)
         }
+        for file in job.files where file.status == .queued {
+            // Queued files have no task to cancel; demote to paused directly.
+            file.status = .paused
+            file.hasResumeData = false
+        }
+        try? context.save()
     }
 
     func resumeJob(_ job: Job) {
+        let limit = currentLimit
+        let alreadyActive = job.files.filter { $0.status == .downloading }.count
+        var slotsLeft = max(0, limit - alreadyActive)
+
         for file in job.files where file.status == .paused || file.status == .failed {
-            startFile(file, in: job)
+            if slotsLeft > 0 {
+                startFile(file, in: job)
+                slotsLeft -= 1
+            } else {
+                file.status = .queued
+                file.lastError = nil
+            }
         }
+        try? context.save()
         recomputeJobStatus(job)
     }
 
@@ -81,6 +98,10 @@ final class DownloadCoordinator {
         for file in job.files {
             engine.cancel(fileID: file.id)
             liveProgress.clear(fileID: file.id)
+            fileEstimators[file.id] = nil
+            if file.status == .queued || file.status == .paused {
+                file.status = .canceled
+            }
         }
         job.status = .canceled
         try? context.save()
@@ -93,7 +114,7 @@ final class DownloadCoordinator {
     }
 
     func retryJob(_ job: Job) {
-        for file in job.files where file.status == .failed {
+        for file in job.files where file.status == .failed || file.status == .canceled {
             file.status = .queued
             file.bytesDownloaded = 0
             file.lastError = nil
@@ -102,15 +123,69 @@ final class DownloadCoordinator {
         startJob(job)
     }
 
-    // MARK: - Internals
+    // MARK: - Public API (per-file)
 
-    private func startJob(_ job: Job) {
-        job.status = .downloading
-        if job.startedAt == nil { job.startedAt = .now }
-        for file in job.files where file.status == .queued || file.status == .paused {
+    func pauseFile(_ file: FileItem) {
+        switch file.status {
+        case .downloading:
+            engine.pause(fileID: file.id)
+        case .queued:
+            file.status = .paused
+            file.hasResumeData = false
+            try? context.save()
+            if let job = file.job { recomputeJobStatus(job) }
+        default:
+            break
+        }
+    }
+
+    func resumeFile(_ file: FileItem) {
+        guard let job = file.job else { return }
+        switch file.status {
+        case .paused, .failed, .canceled, .queued:
             startFile(file, in: job)
+            try? context.save()
+            recomputeJobStatus(job)
+        default:
+            break
+        }
+    }
+
+    func cancelFile(_ file: FileItem) {
+        engine.cancel(fileID: file.id)
+        liveProgress.clear(fileID: file.id)
+        fileEstimators[file.id] = nil
+        if file.status == .queued || file.status == .paused {
+            file.status = .canceled
         }
         try? context.save()
+        if let job = file.job {
+            kickNextQueuedFile(in: job)
+            recomputeJobStatus(job)
+        }
+    }
+
+    // MARK: - Internals
+
+    private var currentLimit: Int {
+        max(1, SettingsStore.shared.maxConcurrentFilesPerJob)
+    }
+
+    private func startJob(_ job: Job) {
+        if job.startedAt == nil { job.startedAt = .now }
+        let limit = currentLimit
+        var started = 0
+        for file in job.files where file.status == .queued || file.status == .paused {
+            if started < limit {
+                startFile(file, in: job)
+                started += 1
+            } else {
+                file.status = .queued
+                file.lastError = nil
+            }
+        }
+        try? context.save()
+        recomputeJobStatus(job)
     }
 
     private func startFile(_ file: FileItem, in job: Job) {
@@ -123,6 +198,14 @@ final class DownloadCoordinator {
         var request = URLRequest(url: file.remoteURL)
         request.cachePolicy = .reloadIgnoringLocalCacheData
         engine.start(fileID: file.id, request: request, destination: file.localURL)
+    }
+
+    /// Promotes the next `.queued` file to `.downloading` if there's a free slot.
+    private func kickNextQueuedFile(in job: Job) {
+        let active = job.files.filter { $0.status == .downloading }.count
+        guard active < currentLimit else { return }
+        guard let next = job.files.first(where: { $0.status == .queued }) else { return }
+        startFile(next, in: job)
     }
 
     private func startProcessingEvents() {
@@ -158,7 +241,10 @@ final class DownloadCoordinator {
             liveProgress.clear(fileID: id)
             fileEstimators[id] = nil
             try? context.save()
-            if let job = file.job { recomputeJobStatus(job) }
+            if let job = file.job {
+                kickNextQueuedFile(in: job)
+                recomputeJobStatus(job)
+            }
 
         case .filePaused(let id, let hasResumeData):
             guard let file = findFile(id) else { return }
@@ -171,16 +257,26 @@ final class DownloadCoordinator {
             liveProgress.clear(fileID: id)
             fileEstimators[id] = nil
             try? context.save()
-            if let job = file.job { recomputeJobStatus(job) }
+            if let job = file.job {
+                kickNextQueuedFile(in: job)
+                recomputeJobStatus(job)
+            }
 
         case .fileFailed(let id, let error):
             guard let file = findFile(id) else { return }
-            file.status = (error.errorDescription == "Canceled") ? .canceled : .failed
+            if case .canceled = error {
+                file.status = .canceled
+            } else {
+                file.status = .failed
+            }
             file.lastError = error.errorDescription
             liveProgress.clear(fileID: id)
             fileEstimators[id] = nil
             try? context.save()
-            if let job = file.job { recomputeJobStatus(job) }
+            if let job = file.job {
+                kickNextQueuedFile(in: job)
+                recomputeJobStatus(job)
+            }
         }
     }
 
@@ -193,19 +289,28 @@ final class DownloadCoordinator {
 
     private func recomputeJobStatus(_ job: Job) {
         let statuses = job.files.map(\.status)
-        if statuses.allSatisfy({ $0 == .completed }) {
+        guard !statuses.isEmpty else { return }
+
+        let hasDownloading = statuses.contains(.downloading)
+        let hasQueued      = statuses.contains(.queued)
+        let hasPaused      = statuses.contains(.paused)
+        let hasFailed      = statuses.contains(.failed)
+        let allCompleted   = statuses.allSatisfy { $0 == .completed }
+        let allCanceled    = statuses.allSatisfy { $0 == .canceled }
+
+        if allCompleted {
             job.status = .completed
-            job.completedAt = .now
-        } else if statuses.contains(.downloading) {
-            job.status = .downloading
-        } else if statuses.allSatisfy({ $0 == .paused || $0 == .completed }) && statuses.contains(.paused) {
-            job.status = .paused
-        } else if statuses.allSatisfy({ $0 == .failed || $0 == .completed || $0 == .canceled })
-                  && statuses.contains(.failed) {
-            job.status = .failed
-            job.completedAt = .now
-        } else if statuses.allSatisfy({ $0 == .canceled }) {
+            if job.completedAt == nil { job.completedAt = .now }
+        } else if allCanceled {
             job.status = .canceled
+        } else if hasDownloading || hasQueued {
+            job.status = .downloading
+            if job.startedAt == nil { job.startedAt = .now }
+        } else if hasPaused {
+            job.status = .paused
+        } else if hasFailed {
+            job.status = .failed
+            if job.completedAt == nil { job.completedAt = .now }
         }
         try? context.save()
     }

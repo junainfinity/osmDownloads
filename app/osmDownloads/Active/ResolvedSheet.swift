@@ -3,6 +3,8 @@ import SwiftUI
 struct ResolvedSheet: View {
     let manifest: ResolvedManifest
     @Binding var selected: Set<UUID>
+    let destinationRoot: URL
+    let onChooseDestination: () -> Void
     let onStart: () -> Void
     let onSelectAll: () -> Void
     let onSelectNone: () -> Void
@@ -189,6 +191,18 @@ struct ResolvedSheet: View {
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.text2)
 
+            destinationChip
+
+            Spacer(minLength: 0)
+            Button("Start download", action: onStart)
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(selected.isEmpty)
+        }
+        .padding(12)
+    }
+
+    private var destinationChip: some View {
+        Button(action: onChooseDestination) {
             HStack(spacing: 5) {
                 Icon(icon: .folder, size: 11, color: Theme.text3)
                 Text(destPath)
@@ -197,17 +211,16 @@ struct ResolvedSheet: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
-            .padding(.horizontal, 7)
+            .padding(.horizontal, 9)
             .padding(.vertical, 4)
             .background(Theme.surface2)
+            .overlay(
+                Capsule().stroke(Theme.border, lineWidth: 1)
+            )
             .clipShape(Capsule())
-
-            Spacer(minLength: 0)
-            Button("Start download", action: onStart)
-                .buttonStyle(PrimaryButtonStyle())
-                .disabled(selected.isEmpty)
         }
-        .padding(12)
+        .buttonStyle(.plain)
+        .help("Click to choose a different folder")
     }
 
     private var summary: String {
@@ -221,6 +234,12 @@ struct ResolvedSheet: View {
 
     private var destPath: String {
         let folder = FileSystemService.slugify(manifest.title)
-        return "~/Downloads/osmDownloads/\(folder)"
+        let full = destinationRoot.appendingPathComponent(folder).path
+        // Pretty-print: collapse $HOME to ~
+        let home = NSHomeDirectory()
+        if full.hasPrefix(home) {
+            return "~" + full.dropFirst(home.count)
+        }
+        return full
     }
 }

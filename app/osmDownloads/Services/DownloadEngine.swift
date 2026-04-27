@@ -13,7 +13,10 @@ final class DownloadEngine: NSObject, URLSessionDownloadDelegate, @unchecked Sen
     private let lock = NSLock()
     private var tasks: [UUID: URLSessionDownloadTask] = [:]
     private var destinations: [UUID: URL] = [:]
-    private var pauseHandlers: Set<UUID> = []   // file IDs whose cancel-with-resume-data is in flight
+    /// File IDs the user explicitly stopped (vs. paused). `didCompleteWithError`
+    /// uses this to distinguish a stop (emit `.canceled`) from a pause (let the
+    /// cancel-with-resume-data completion handler emit `.filePaused`).
+    private var stopRequested: Set<UUID> = []
     private var session: URLSession!
 
     init(configuration: URLSessionConfiguration = .defaultEngine()) {
@@ -56,31 +59,31 @@ final class DownloadEngine: NSObject, URLSessionDownloadDelegate, @unchecked Sen
     func pause(fileID: UUID) {
         lock.lock()
         guard let task = tasks[fileID] else { lock.unlock(); return }
-        pauseHandlers.insert(fileID)
         lock.unlock()
 
+        // Only this completion handler emits `.filePaused`. The corresponding
+        // `didCompleteWithError` with NSURLErrorCancelled is a no-op (filtered
+        // by the empty `stopRequested` set).
         task.cancel(byProducingResumeData: { [weak self] data in
             guard let self else { return }
             self.lock.lock()
             self.tasks[fileID] = nil
-            self.pauseHandlers.remove(fileID)
             self.lock.unlock()
             if let data {
                 try? ResumeStore.write(data, for: fileID)
-                self.continuation.yield(.filePaused(fileID: fileID, hasResumeData: true))
-            } else {
-                self.continuation.yield(.filePaused(fileID: fileID, hasResumeData: false))
             }
+            self.continuation.yield(.filePaused(fileID: fileID, hasResumeData: data != nil))
         })
     }
 
     func cancel(fileID: UUID) {
         lock.lock()
-        let task = tasks.removeValue(forKey: fileID)
-        destinations[fileID] = nil
+        stopRequested.insert(fileID)
+        let task = tasks[fileID]
         lock.unlock()
         task?.cancel()
         ResumeStore.delete(for: fileID)
+        // Map cleanup happens in didCompleteWithError where we'll see NSURLErrorCancelled.
     }
 
     /// Walk OS-persisted tasks (for `.background` config) and re-bind by `taskDescription`.
@@ -157,18 +160,26 @@ final class DownloadEngine: NSObject, URLSessionDownloadDelegate, @unchecked Sen
                     task: URLSessionTask,
                     didCompleteWithError error: Error?) {
         guard let id = UUID(uuidString: task.taskDescription ?? "") else { return }
-
-        // Skip if the cancel-with-resume-data callback owns this completion.
-        lock.lock()
-        let isPausing = pauseHandlers.contains(id)
-        lock.unlock()
-        if isPausing { return }
-
         guard let error = error as? NSError else { return }   // success path is handled in didFinishDownloadingTo
 
         if error.domain == NSURLErrorDomain && error.code == NSURLErrorCancelled {
-            continuation.yield(.fileFailed(fileID: id, error: .canceled))
-        } else if error.code == NSFileWriteOutOfSpaceError {
+            // Distinguish stop (user pressed Stop) from pause (Pause).
+            lock.lock()
+            let wasStop = stopRequested.contains(id)
+            stopRequested.remove(id)
+            if wasStop {
+                tasks[id] = nil
+                destinations[id] = nil
+            }
+            lock.unlock()
+            if wasStop {
+                continuation.yield(.fileFailed(fileID: id, error: .canceled))
+            }
+            // Otherwise it was a pause — the cancel completion handler is authoritative.
+            return
+        }
+
+        if error.code == NSFileWriteOutOfSpaceError {
             continuation.yield(.fileFailed(fileID: id, error: .diskFull))
         } else if let urlError = error as? URLError {
             continuation.yield(.fileFailed(fileID: id, error: .network(urlError)))

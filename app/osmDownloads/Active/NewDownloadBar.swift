@@ -58,6 +58,10 @@ struct NewDownloadBar: View {
                 ResolvedSheet(
                     manifest: manifest,
                     selected: $resolveVM.selectedFileIDs,
+                    destinationRoot: effectiveDestination,
+                    onChooseDestination: {
+                        resolveVM.chooseDestination(suggesting: settings.destinationFolderURL)
+                    },
                     onStart: { startIfReady() },
                     onSelectAll: { resolveVM.selectAll() },
                     onSelectNone: { resolveVM.selectNone() }
@@ -120,12 +124,16 @@ struct NewDownloadBar: View {
         }
     }
 
+    private var effectiveDestination: URL {
+        resolveVM.destinationOverride ?? settings.destinationFolderURL
+    }
+
     private func startIfReady() {
         guard let manifest = resolveVM.resolvedManifest, !resolveVM.selectedFileIDs.isEmpty else { return }
         jobs.enqueue(
             manifest: manifest,
             selectedFileIDs: resolveVM.selectedFileIDs,
-            destination: settings.destinationFolderURL
+            destination: effectiveDestination
         )
         resolveVM.reset()
     }

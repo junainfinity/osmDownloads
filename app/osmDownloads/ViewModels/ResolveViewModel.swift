@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 
@@ -18,6 +19,9 @@ final class ResolveViewModel {
     }
     var state: ResolveState = .idle
     var selectedFileIDs: Set<UUID> = []
+    /// Per-resolve override for the destination root. nil = use the global default
+    /// from `SettingsStore.destinationFolderURL`.
+    var destinationOverride: URL?
 
     private var resolveTask: Task<Void, Never>?
     private let cache = ResolverCache()
@@ -25,6 +29,26 @@ final class ResolveViewModel {
 
     init(session: URLSession = .shared) {
         self.session = session
+    }
+
+    /// Open the system folder picker. The user's choice persists for the rest
+    /// of this resolve session and is cleared on `reset()`.
+    func chooseDestination(suggesting current: URL? = nil) {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.title = "Choose download destination"
+        panel.prompt = "Choose"
+        panel.directoryURL = destinationOverride ?? current
+        if panel.runModal() == .OK, let url = panel.url {
+            destinationOverride = url
+        }
+    }
+
+    func clearDestinationOverride() {
+        destinationOverride = nil
     }
 
     var canDownload: Bool {
@@ -48,6 +72,7 @@ final class ResolveViewModel {
         urlString = ""
         state = .idle
         selectedFileIDs = []
+        destinationOverride = nil
         resolveTask?.cancel()
         resolveTask = nil
     }

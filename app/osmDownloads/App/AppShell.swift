@@ -48,6 +48,7 @@ private struct Titlebar: View {
     @Environment(AppViewModel.self) private var appVM
     @Environment(SettingsStore.self) private var settings
     @Query(filter: #Predicate<Job> { $0.statusRaw == "downloading" }) private var activeJobs: [Job]
+    @State private var settingsOpen: Bool = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -62,17 +63,21 @@ private struct Titlebar: View {
             Spacer(minLength: 0)
             ThemeToggle()
             Button {
-                // Settings sheet — M6
+                settingsOpen = true
             } label: {
                 Icon(icon: .settings, size: 15, color: Theme.text2)
             }
             .buttonStyle(.borderless)
             .help("Settings")
+            .keyboardShortcut(",", modifiers: .command)
         }
         .padding(.horizontal, 22)
         .padding(.vertical, 12)
         .frame(height: 48)
         .background(Theme.surface)
+        .sheet(isPresented: $settingsOpen) {
+            SettingsSheet()
+        }
     }
 
     private var title: String {

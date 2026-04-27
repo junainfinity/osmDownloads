@@ -71,6 +71,14 @@ enum ThemePreference: String, CaseIterable, Sendable {
         case .dark:   return .dark
         }
     }
+
+    var label: String {
+        switch self {
+        case .system: return "System"
+        case .light:  return "Light"
+        case .dark:   return "Dark"
+        }
+    }
 }
 
 enum Density: String, CaseIterable, Sendable {

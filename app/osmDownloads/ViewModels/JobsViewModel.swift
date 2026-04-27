@@ -24,6 +24,10 @@ final class JobsViewModel {
     func remove(_ job: Job) { coordinator.removeJob(job) }
     func retry(_ job: Job)  { coordinator.retryJob(job)  }
 
+    func pauseFile(_ file: FileItem)  { coordinator.pauseFile(file)  }
+    func resumeFile(_ file: FileItem) { coordinator.resumeFile(file) }
+    func cancelFile(_ file: FileItem) { coordinator.cancelFile(file) }
+
     func pauseAll(jobs: [Job]) {
         for job in jobs where job.status == .downloading { pause(job) }
     }

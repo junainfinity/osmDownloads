@@ -3,6 +3,7 @@ import SwiftUI
 struct FileRow: View {
     @Bindable var file: FileItem
     @Environment(LiveProgressStore.self) private var live
+    @Environment(JobsViewModel.self) private var jobs
 
     var body: some View {
         HStack(spacing: 10) {
@@ -27,8 +28,8 @@ struct FileRow: View {
                 .foregroundStyle(Theme.text3)
                 .frame(minWidth: 110, alignment: .trailing)
 
-            statusGlyph
-                .frame(width: 14)
+            controls
+                .frame(width: 56, alignment: .trailing)
         }
         .padding(.vertical, 6)
     }
@@ -49,19 +50,40 @@ struct FileRow: View {
         return Double(bytes) / Double(total)
     }
 
+    /// Per-file action row — pause/resume/cancel for files in active states,
+    /// and a static glyph for terminal states.
     @ViewBuilder
-    private var statusGlyph: some View {
-        switch file.status {
-        case .completed:
-            Icon(icon: .checkOn, size: 12, color: Theme.success)
-        case .failed:
-            Icon(icon: .warn, size: 12, color: Theme.danger)
-        case .paused:
-            Icon(icon: .pause, size: 11, color: Theme.text3)
-        case .canceled:
-            Icon(icon: .stop, size: 11, color: Theme.text3)
-        case .downloading, .queued:
-            EmptyView()
+    private var controls: some View {
+        HStack(spacing: 4) {
+            switch file.status {
+            case .downloading:
+                fileButton(.pause, label: "Pause") { jobs.pauseFile(file) }
+                fileButton(.stop,  label: "Stop")  { jobs.cancelFile(file) }
+            case .paused, .queued:
+                fileButton(.play, label: "Resume") { jobs.resumeFile(file) }
+                fileButton(.stop, label: "Stop")   { jobs.cancelFile(file) }
+            case .failed:
+                fileButton(.refresh, label: "Retry") { jobs.resumeFile(file) }
+            case .completed:
+                Icon(icon: .checkOn, size: 12, color: Theme.success)
+            case .canceled:
+                Icon(icon: .stop, size: 11, color: Theme.text3)
+            }
         }
+    }
+
+    private func fileButton(_ icon: AppIcon, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Icon(icon: icon, size: 10, color: Theme.text2)
+                .frame(width: 22, height: 22)
+                .background(Theme.surface2)
+                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .stroke(Theme.border, lineWidth: 1)
+                )
+        }
+        .buttonStyle(.borderless)
+        .help(label)
     }
 }
