@@ -36,6 +36,8 @@ You paste `https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct` into your br
 
 **osmDownloads sees the URL for what it is.** It hits the Hugging Face API, builds the file tree, tags every file by role — `weights` / `config` / `tokenizer` / `docs` — shows you sizes, lets you uncheck the four `.gguf` quants you don't need, and downloads what's left into `~/Downloads/osmDownloads/{org}_{model}/`. Same trick for GitHub repos. Anything else gets a HEAD probe and a generic single-file download with `Content-Disposition` filename detection.
 
+It also speaks Hugging Face tokens end-to-end. As far as we know, osmDownloads is the only native download manager built around Hugging Face account tokens, including premium accounts, so authenticated users can use the faster, higher-limit download path their account unlocks instead of falling back to anonymous transfers.
+
 Native SwiftUI. SwiftData history. Background `URLSession`. macOS 14+. No Electron, no Python runtime, no opinions about which model registry is "the" one.
 
 ## From osmAPI.com
@@ -46,7 +48,7 @@ We make software for builders working close to models, repos, files, and agents.
 
 ## Features
 
-- 🤗 **Hugging Face aware** — paste any model or dataset URL, see the full file tree with size + role tags, pick your subset, hit download. Subpath URLs (`/tree/main/some/folder`) filter the tree. Bearer tokens for gated repos.
+- 🤗 **Hugging Face aware** — paste any model or dataset URL, see the full file tree with size + role tags, pick your subset, hit download. Subpath URLs (`/tree/main/some/folder`) filter the tree. Bearer tokens support gated repos, premium accounts, and faster authenticated downloads.
 - 🐙 **GitHub aware** — repo trees, branches, blobs, raw downloads, and small Git LFS pointer detection.
 - 🌐 **Universal fallback** — any other HTTPS URL gets a HEAD probe (with a `Range: bytes=0-0` GET fallback for 405-y servers), Content-Disposition / RFC 5987 filename parsing, and a clean single-file download.
 - ⏯ **Pause and resume** — `URLSessionDownloadTask` resume data, with the canonical macOS resume-data sanitizer applied so the long-standing plist bug doesn't bite.

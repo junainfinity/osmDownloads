@@ -235,6 +235,11 @@ final class DownloadCoordinator {
 
         var request = URLRequest(url: file.remoteURL)
         request.cachePolicy = .reloadIgnoringLocalCacheData
+        if job.source == .huggingFace,
+           let token = KeychainService.get(.huggingFace)?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
         engine.start(fileID: file.id, request: request, destination: file.localURL)
     }
 
