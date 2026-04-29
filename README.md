@@ -149,7 +149,7 @@ xcodebuild test -scheme osmDownloads -destination 'platform=macOS'
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-Full design notes live in [`handoff/`](handoff/) — `SPEC.md`, `ARCHITECTURE.md`, `DOWNLOAD_ENGINE.md`, `SOURCE_RESOLVERS.md`, `PERSISTENCE.md`, `UI_MAPPING.md`. Open the prototype at [`osmDownloads.html`](osmDownloads.html) alongside the Swift source as the visual contract.
+Open the prototype at [`osmDownloads.html`](osmDownloads.html) alongside the Swift source as the visual contract.
 
 ## Roadmap
 
@@ -189,7 +189,6 @@ osmDownloads/
 │   ├── project.yml               XcodeGen spec — regenerate with `xcodegen generate`
 │   └── osmDownloads.xcodeproj    Generated; checked in for convenience
 │
-├── handoff/                  Engineering handoff docs (the spec)
 ├── screenshots/              UI references + README assets
 ├── assets/                   Brand assets (light + dark logo)
 │
