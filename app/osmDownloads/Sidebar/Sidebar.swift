@@ -32,6 +32,16 @@ struct Sidebar: View {
             }
             .padding(.horizontal, 8)
 
+            SectionTitle("Project")
+                .padding(.horizontal, 12)
+                .padding(.top, 18)
+                .padding(.bottom, 6)
+
+            VStack(alignment: .leading, spacing: 2) {
+                NavRow(view: .about, icon: .info, count: 0)
+            }
+            .padding(.horizontal, 8)
+
             Spacer(minLength: 0)
 
             DiskMeter()
@@ -118,6 +128,7 @@ private struct NavRow: View {
         case .active:  return "Active"
         case .history: return "History"
         case .queue:   return "Queue"
+        case .about:   return "About"
         }
     }
 }

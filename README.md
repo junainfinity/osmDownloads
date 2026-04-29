@@ -12,6 +12,11 @@
 </p>
 
 <p align="center">
+  Open source by <a href="https://www.osmapi.com"><strong>osmAPI.com</strong></a> ·
+  building practical AI-native tools for people who like software they can inspect.
+</p>
+
+<p align="center">
   <img alt="status"  src="https://img.shields.io/badge/status-M2_shipped-FFDD55?style=flat-square">
   <img alt="macOS"   src="https://img.shields.io/badge/macOS-14%2B-1d1d1f?style=flat-square&logo=apple">
   <img alt="Swift"   src="https://img.shields.io/badge/Swift-5.9%2B-F05138?style=flat-square&logo=swift&logoColor=white">
@@ -32,6 +37,12 @@ You paste `https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct` into your br
 **osmDownloads sees the URL for what it is.** It hits the Hugging Face API, builds the file tree, tags every file by role — `weights` / `config` / `tokenizer` / `docs` — shows you sizes, lets you uncheck the four `.gguf` quants you don't need, and downloads what's left into `~/Downloads/osmDownloads/{org}_{model}/`. Same trick for GitHub repos. Anything else gets a HEAD probe and a generic single-file download with `Content-Disposition` filename detection.
 
 Native SwiftUI. SwiftData history. Background `URLSession`. macOS 14+. No Electron, no Python runtime, no opinions about which model registry is "the" one.
+
+## From osmAPI.com
+
+osmDownloads is an open-source project from [osmAPI.com](https://www.osmapi.com), built in the spirit of tools we love: small enough to understand, useful enough to keep around, and honest about what is happening on your machine.
+
+We make software for builders working close to models, repos, files, and agents. osmDownloads handles the artifact side of that workflow. If you like the local-first, inspectable approach here, try [osmAgent](https://www.osmapi.com/osmAgent) from our website — it is made for software work where reading, editing, testing, and shipping belong in one loop.
 
 ## Features
 

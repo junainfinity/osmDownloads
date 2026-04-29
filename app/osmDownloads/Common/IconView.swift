@@ -24,6 +24,8 @@ enum AppIcon: String {
     case refresh    = "arrow.clockwise"
     case trash      = "trash"
     case sidebar    = "sidebar.left"
+    case info       = "info.circle"
+    case code       = "curlybraces"
 }
 
 /// Lightweight SF Symbols wrapper. Pass a size and tint; falls back to text2.

@@ -21,22 +21,16 @@ struct SettingsSheet: View {
 
     @State private var loaded: Bool = false
     @State private var saveButtonState: SaveButtonState = .save
+    @State private var selectedTab: SettingsTab = .preferences
 
     enum SaveButtonState { case save, done }
+    enum SettingsTab: Hashable { case preferences, about }
 
     var body: some View {
         VStack(spacing: 0) {
             header
             ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    appearanceSection
-                    downloadsSection
-                    networkSection
-                    authSection
-                    storageSection
-                }
-                .padding(.horizontal, 22)
-                .padding(.vertical, 18)
+                content
             }
             footer
         }
@@ -60,11 +54,17 @@ struct SettingsSheet: View {
     // MARK: - Header / footer
 
     private var header: some View {
-        HStack {
-            Text("Settings")
+        HStack(spacing: 14) {
+            Text(selectedTab == .preferences ? "Settings" : "About")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Theme.text)
             Spacer()
+            Picker("", selection: $selectedTab) {
+                Text("Preferences").tag(SettingsTab.preferences)
+                Text("About").tag(SettingsTab.about)
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 214)
         }
         .padding(.horizontal, 22)
         .padding(.vertical, 14)
@@ -97,6 +97,26 @@ struct SettingsSheet: View {
     }
 
     // MARK: - Sections
+
+    @ViewBuilder
+    private var content: some View {
+        switch selectedTab {
+        case .preferences:
+            VStack(alignment: .leading, spacing: 22) {
+                appearanceSection
+                downloadsSection
+                networkSection
+                authSection
+                storageSection
+            }
+            .padding(.horizontal, 22)
+            .padding(.vertical, 18)
+        case .about:
+            SettingsAboutView()
+                .padding(.horizontal, 22)
+                .padding(.vertical, 18)
+        }
+    }
 
     private var appearanceSection: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -475,5 +495,147 @@ struct SettingsSheet: View {
 
     private static func formatSeconds(_ d: Double) -> String {
         "\(Int(d.rounded())) s"
+    }
+}
+
+private struct SettingsAboutView: View {
+    private let websiteURL = URL(string: "https://www.osmapi.com")!
+    private let agentURL = URL(string: "https://www.osmapi.com/osmAgent")!
+    private let repoURL = URL(string: "https://github.com/junainfinity/osmDownloads")!
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            hero
+            values
+            osmAgentCallout
+        }
+    }
+
+    private var hero: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                Image("Logo")
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 38, height: 38)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("osmDownloads")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(Theme.text)
+                    Text("Open source macOS downloader by osmAPI.com")
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(Theme.text3)
+                }
+            }
+
+            Text("Open source, built for people who move real artifacts.")
+                .font(.system(size: 21, weight: .semibold))
+                .foregroundStyle(Theme.text)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text("osmDownloads downloads Hugging Face models, GitHub files, and direct URLs into a predictable local workflow. Fork it, inspect it, adapt it for your stack, and send improvements back when they help others.")
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.text2)
+                .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
+
+            buttonRow
+        }
+        .padding(16)
+        .background(Theme.surface2)
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                .stroke(Theme.border, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous))
+    }
+
+    private var values: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle("Project values")
+            valueRow(icon: .code, title: "Readable by design", text: "MIT licensed SwiftUI with practical layers and plain local storage.")
+            valueRow(icon: .folderOpen, title: "Local-first", text: "Downloads land on your Mac, tokens stay in Keychain, and history remains yours.")
+            valueRow(icon: .download, title: "Artifact aware", text: "Built around model files, repo trees, raw files, and resumable downloads.")
+        }
+    }
+
+    private var osmAgentCallout: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle("From osmAPI.com")
+            Text("If this kind of builder-first tooling feels right, try osmAgent from our website. It is made for software work where inspection, edits, tests, and shipping all belong in the same loop.")
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.text2)
+                .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button {
+                NSWorkspace.shared.open(agentURL)
+            } label: {
+                HStack(spacing: 6) {
+                    Text("Try osmAgent")
+                    Icon(icon: .link, size: 11, color: Theme.accentInk)
+                }
+            }
+            .buttonStyle(PrimaryButtonStyle())
+        }
+        .padding(14)
+        .background(Theme.accentSoft)
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                .stroke(Theme.borderStrong, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous))
+    }
+
+    private var buttonRow: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                linkButton("Open project", icon: .link, url: repoURL)
+                linkButton("osmAPI.com", icon: .globe, url: websiteURL)
+                linkButton("osmAgent", icon: .link, url: agentURL)
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                linkButton("Open project", icon: .link, url: repoURL)
+                linkButton("osmAPI.com", icon: .globe, url: websiteURL)
+                linkButton("osmAgent", icon: .link, url: agentURL)
+            }
+        }
+    }
+
+    private func valueRow(icon: AppIcon, title: String, text: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Icon(icon: icon, size: 14, color: Theme.text2)
+                .frame(width: 24, height: 24)
+                .background(Theme.surface2)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSm, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.text)
+                Text(text)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.text3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func linkButton(_ title: String, icon: AppIcon, url: URL) -> some View {
+        Button {
+            NSWorkspace.shared.open(url)
+        } label: {
+            HStack(spacing: 6) {
+                Text(title)
+                Icon(icon: icon, size: 11, color: Theme.text2)
+            }
+        }
+        .buttonStyle(GhostButtonStyle(compact: true))
+    }
+
+    private func sectionTitle(_ s: String) -> some View {
+        Text(s.uppercased())
+            .font(.system(size: 10.5, weight: .semibold))
+            .tracking(0.08 * 10.5)
+            .foregroundStyle(Theme.text3)
     }
 }

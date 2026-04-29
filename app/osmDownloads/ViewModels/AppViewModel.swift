@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 enum MainView: String, Hashable, CaseIterable, Sendable {
-    case active, history, queue
+    case active, history, queue, about
 }
 
 enum SourceFilter: String, Hashable, CaseIterable, Sendable {

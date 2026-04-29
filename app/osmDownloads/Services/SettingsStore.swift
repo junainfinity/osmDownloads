@@ -49,6 +49,9 @@ final class SettingsStore: @unchecked Sendable {
 
     private init() {
         let d = UserDefaults.standard
+        d.register(defaults: [
+            "themePreference": ThemePreference.system.rawValue
+        ])
         self.maxConcurrentJobs        = d.object(forKey: "maxConcurrentJobs") as? Int ?? 3
         self.maxConcurrentFilesPerJob = d.object(forKey: "maxConcurrentFilesPerJob") as? Int ?? 4
         self.retryCount               = d.object(forKey: "retryCount") as? Int ?? 3
