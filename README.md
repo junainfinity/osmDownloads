@@ -36,14 +36,14 @@ Native SwiftUI. SwiftData history. Background `URLSession`. macOS 14+. No Electr
 ## Features
 
 - 🤗 **Hugging Face aware** — paste any model or dataset URL, see the full file tree with size + role tags, pick your subset, hit download. Subpath URLs (`/tree/main/some/folder`) filter the tree. Bearer tokens for gated repos.
-- 🐙 **GitHub on deck** — repo trees, branches, blobs, raw downloads (M3, scaffolded).
+- 🐙 **GitHub aware** — repo trees, branches, blobs, raw downloads, and small Git LFS pointer detection.
 - 🌐 **Universal fallback** — any other HTTPS URL gets a HEAD probe (with a `Range: bytes=0-0` GET fallback for 405-y servers), Content-Disposition / RFC 5987 filename parsing, and a clean single-file download.
 - ⏯ **Pause and resume** — `URLSessionDownloadTask` resume data, with the canonical macOS resume-data sanitizer applied so the long-standing plist bug doesn't bite.
 - ⚡ **Real concurrency** — actor-based engine, per-job and cross-job concurrency caps, an EMA-smoothed speed estimator that doesn't jitter.
 - 🎨 **Light + dark** — design tokens (colors, radii, motion timings) lifted directly from the prototype's CSS. Logo and app icon adapt to system appearance.
 - 🔐 **Tokens in the Keychain** — never on disk in plain text, never in `UserDefaults`.
 - 🕒 **History that survives** — SwiftData store at `~/Library/Application Support/osmDownloads/store.sqlite`. Search by title or URL, segmented filter, retry, reveal in Finder.
-- 🧪 **32 tests** — URL classifier, EMA speed estimator, Generic + Hugging Face resolvers (with `URLProtocol` mocks for HTTP).
+- 🧪 **38 tests** — URL classifier, EMA speed estimator, Generic + Hugging Face + GitHub resolvers (with `URLProtocol` mocks for HTTP).
 
 ## Screenshots
 
@@ -62,19 +62,19 @@ More in [`screenshots/`](screenshots/) — light variants, GitHub URL detection,
 
 ## Quick start
 
-### Run the prebuilt app
+### Run a local packaged app
 
-A Release build is committed at [`app/osmDownloads.app`](app/osmDownloads.app):
+Release app bundles are generated locally and ignored by git. If a packaged copy exists in the project folder:
 
 ```sh
-open app/osmDownloads.app
+open osmDownloads.app
 ```
 
-The first launch will hit Gatekeeper since the bundle is ad-hoc signed. Right-click → **Open**, or strip the quarantine attribute:
+The first launch may hit Gatekeeper since local builds are ad-hoc signed. Right-click → **Open**, or strip the quarantine attribute:
 
 ```sh
-xattr -d com.apple.quarantine app/osmDownloads.app
-open app/osmDownloads.app
+xattr -d com.apple.quarantine osmDownloads.app
+open osmDownloads.app
 ```
 
 ### Build from source
@@ -102,13 +102,13 @@ cd app
 xcodebuild test -scheme osmDownloads -destination 'platform=macOS'
 ```
 
-32 tests, sub-second on Apple Silicon.
+38 tests, sub-second on Apple Silicon.
 
 ## Stack
 
 | Layer       | Choice                                                                       |
 |-------------|------------------------------------------------------------------------------|
-| UI          | SwiftUI · `@Observable` · `NavigationSplitView` · `@Query`                   |
+| UI          | SwiftUI · `@Observable` · fixed sidebar shell · `@Query`                     |
 | Persistence | SwiftData (`Job`, `FileItem`) + on-disk resume blobs                         |
 | Networking  | `URLSession` with delegate · `AsyncStream<DownloadEvent>`                    |
 | Concurrency | `actor` engine + `@MainActor` coordinator + per-job concurrency limiter      |
@@ -157,11 +157,11 @@ Full design notes live in [`handoff/`](handoff/) — `SPEC.md`, `ARCHITECTURE.md
 |-----|-------------|--------------------------------------------------------------------------------|
 | M1  | ✅ shipped  | Generic single-file downloads end-to-end (URL → engine → reveal in Finder)     |
 | M2  | ✅ shipped  | Hugging Face resolver + multi-file picker (search, sort by group/size, tokens) |
-| M3  | 🚧 next     | GitHub resolver — repo trees, blobs, raw URLs, LFS detection                   |
-| M4  | 🚧          | `URLSession.background` for relaunch survival, reachability auto-resume        |
-| M5  | 🚧          | History actions polish: retry, bulk clear, auto-clear-by-age                   |
-| M6  | 🚧          | Settings sheet · token UI · theme picker · density · destination picker        |
-| M7  | 🚧          | Dock badge · completion notifications · menu bar item · drag-drop URL on dock  |
+| M3  | ✅ shipped  | GitHub resolver — repo trees, blobs, raw URLs, LFS detection                   |
+| M4  | ✅ shipped  | `URLSession.background` for relaunch survival, reachability auto-resume        |
+| M5  | ✅ shipped  | History actions polish: retry, bulk clear, auto-clear-by-age                   |
+| M6  | ✅ shipped  | Settings sheet · token UI · theme picker · density · destination picker        |
+| M7  | ✅ shipped  | Dock badge · completion notifications · menu bar item · URL/file handoff       |
 
 ## Repo layout
 
@@ -177,7 +177,7 @@ osmDownloads/
 │   │   ├── Sidebar/                Brand, nav, source breakdown, disk meter
 │   │   ├── Active/                 NewDownloadBar, ResolvedSheet, JobCard, FileRow
 │   │   ├── History/                HistoryView, HistoryRow
-│   │   ├── Queue/ Settings/        Stub views for M4/M6
+│   │   ├── Queue/ Settings/        Queue controls and app preferences
 │   │   ├── Common/                 Theme, StatusPill, ProgressBar, IconView, Fmt
 │   │   ├── Services/               URLClassifier, resolvers, engine, coordinator, …
 │   │   ├── ViewModels/             Observable VMs
@@ -185,10 +185,9 @@ osmDownloads/
 │   │   ├── Assets.xcassets/        AppIcon (10 sizes) + Logo (light/dark)
 │   │   ├── Models.swift            SwiftData @Model types + DTOs
 │   │   └── osmDownloadsApp.swift   @main entry, ModelContainer setup
-│   ├── osmDownloadsTests/        XCTest suite (32 tests)
+│   ├── osmDownloadsTests/        XCTest suite (38 tests)
 │   ├── project.yml               XcodeGen spec — regenerate with `xcodegen generate`
-│   ├── osmDownloads.xcodeproj    Generated; checked in for convenience
-│   └── osmDownloads.app          Pre-built Release binary (4.2 MB)
+│   └── osmDownloads.xcodeproj    Generated; checked in for convenience
 │
 ├── handoff/                  Engineering handoff docs (the spec)
 ├── screenshots/              UI references + README assets

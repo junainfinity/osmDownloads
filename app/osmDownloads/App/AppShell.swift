@@ -1,29 +1,38 @@
+import AppKit
 import SwiftData
 import SwiftUI
 
 struct AppShell: View {
     @Environment(AppViewModel.self) private var appVM
     @Environment(SettingsStore.self) private var settings
-    @State private var sidebarVisibility = NavigationSplitViewVisibility.all
+    @State private var sidebarVisible = true
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $sidebarVisibility) {
-            Sidebar()
-                .navigationSplitViewColumnWidth(min: 220, ideal: 232, max: 260)
-        } detail: {
-            MainPane()
+        HStack(spacing: 0) {
+            if sidebarVisible {
+                Sidebar()
+                    .frame(width: 232)
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+
+                Divider().background(Theme.border)
+            }
+
+            MainPane(sidebarVisible: $sidebarVisible)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .navigationSplitViewStyle(.balanced)
         .background(Theme.bg)
+        .background(WindowToolbarSuppressor())
+        .animation(.easeOut(duration: 0.18), value: sidebarVisible)
     }
 }
 
 private struct MainPane: View {
     @Environment(AppViewModel.self) private var appVM
+    @Binding var sidebarVisible: Bool
 
     var body: some View {
         VStack(spacing: 0) {
-            Titlebar()
+            Titlebar(sidebarVisible: $sidebarVisible)
             Divider().background(Theme.border)
             ContentRouter()
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -48,10 +57,19 @@ private struct Titlebar: View {
     @Environment(AppViewModel.self) private var appVM
     @Environment(SettingsStore.self) private var settings
     @Query(filter: #Predicate<Job> { $0.statusRaw == "downloading" }) private var activeJobs: [Job]
+    @Binding var sidebarVisible: Bool
     @State private var settingsOpen: Bool = false
 
     var body: some View {
         HStack(spacing: 12) {
+            Button {
+                sidebarVisible.toggle()
+            } label: {
+                Icon(icon: .sidebar, size: 15, color: Theme.text2)
+            }
+            .buttonStyle(IconButtonStyle())
+            .help(sidebarVisible ? "Hide sidebar" : "Show sidebar")
+
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
                     .font(.system(size: 17, weight: .semibold))
@@ -96,6 +114,23 @@ private struct Titlebar: View {
         case .history: return ""
         case .queue:   return ""
         }
+    }
+}
+
+private struct WindowToolbarSuppressor: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        DispatchQueue.main.async { configure(view.window) }
+        return view
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        DispatchQueue.main.async { configure(view.window) }
+    }
+
+    private func configure(_ window: NSWindow?) {
+        guard let window else { return }
+        window.toolbar = nil
     }
 }
 

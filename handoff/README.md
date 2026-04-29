@@ -17,20 +17,20 @@
 
 ## Target
 
-- **Platform:** macOS 14+ (Sonoma) — uses SwiftData, async URLSession, NavigationSplitView
+- **Platform:** macOS 14+ (Sonoma) — uses SwiftData, async URLSession, SwiftUI shell
 - **Language:** Swift 5.9+, SwiftUI
 - **Distribution:** Direct download + Sparkle for updates (not Mac App Store — needs unrestricted disk write + reveal-in-Finder)
 - **Sandbox:** Off (or with user-selected destination folder bookmark)
 
 ## Recommended milestones
 
-1. **M1 — Single-file downloads.** URL bar → unsupported path → URLSession download → progress → done. Reveal in Finder. No persistence.
-2. **M2 — Hugging Face resolver.** Parse `huggingface.co/{org}/{repo}` URLs, fetch tree via API, file picker UI, multi-file job.
-3. **M3 — GitHub resolver.** Parse `github.com/{org}/{repo}` (and `/tree/{branch}/{path}`), fetch tree, picker, download via raw.githubusercontent.com.
-4. **M4 — Pause/resume + concurrency.** Resume data persistence, max-concurrent setting, queue.
-5. **M5 — History & persistence.** SwiftData store, History view, bulk-clear actions, retry.
-6. **M6 — Settings + auth.** Hugging Face token (gated repos), GitHub token (rate limits), default destination, theme.
-7. **M7 — Polish.** Dock badge with active count, notifications on completion, menu bar item, drag-drop URL onto dock icon.
+1. **M1 — Single-file downloads.** Shipped.
+2. **M2 — Hugging Face resolver.** Shipped.
+3. **M3 — GitHub resolver.** Shipped.
+4. **M4 — Pause/resume + concurrency.** Shipped.
+5. **M5 — History & persistence.** Shipped.
+6. **M6 — Settings + auth.** Shipped.
+7. **M7 — Polish.** Shipped.
 
 ## Local setup
 

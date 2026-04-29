@@ -1,7 +1,6 @@
 import Foundation
 import Security
 
-// TODO: M6 — wire to the Settings sheet's auth section.
 enum KeychainService {
     enum Account: String {
         case huggingFace = "huggingface.token"

@@ -106,7 +106,7 @@ final class ResolveViewModel {
         let kind = URLClassifier.classify(trimmed)
         state = .classified(kind)
 
-        // Auto-resolve generic URLs and HF/GH URLs (HF/GH are stubs in M1).
+        // Auto-resolve generic, Hugging Face, and GitHub URLs after a short debounce.
         resolveTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(300))   // debounce
             guard !Task.isCancelled else { return }
@@ -127,7 +127,10 @@ final class ResolveViewModel {
             await runResolver(HuggingFaceResolver(session: session, token: token),
                               kind: kind, cacheKey: cacheKey)
         case .github, .githubFile:
-            state = .error("GitHub is coming in M3")
+            let cacheKey = kind.originalURL ?? URL(string: "github:\(UUID().uuidString)")!
+            let token = KeychainService.get(.github)
+            await runResolver(GitHubResolver(session: session, token: token),
+                              kind: kind, cacheKey: cacheKey)
         }
     }
 

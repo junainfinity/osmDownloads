@@ -3,9 +3,8 @@ import Foundation
 /// Wraps a single `URLSession` and emits per-file events. The Coordinator owns
 /// one Engine; views never touch this directly.
 ///
-/// M1 uses `.default` configuration. Switching to `.background(withIdentifier:)`
-/// for relaunch-survival is M4 (Pause/resume + concurrency) work.
 final class DownloadEngine: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
+    static var backgroundCompletionHandler: (() -> Void)?
 
     let events: AsyncStream<DownloadEvent>
     private let continuation: AsyncStream<DownloadEvent>.Continuation
@@ -24,7 +23,7 @@ final class DownloadEngine: NSObject, URLSessionDownloadDelegate, @unchecked Sen
     private var throttleWindow: [(Date, Int64)] = []
     private var throttleWindowSum: Int64 = 0
 
-    init(configuration: URLSessionConfiguration = .defaultEngine()) {
+    init(configuration: URLSessionConfiguration = .backgroundEngine()) {
         var cont: AsyncStream<DownloadEvent>.Continuation!
         self.events = AsyncStream<DownloadEvent>(bufferingPolicy: .unbounded) { cont = $0 }
         self.continuation = cont
@@ -38,7 +37,7 @@ final class DownloadEngine: NSObject, URLSessionDownloadDelegate, @unchecked Sen
 
     deinit {
         continuation.finish()
-        session.invalidateAndCancel()
+        session.finishTasksAndInvalidate()
     }
 
     // MARK: - Public API
@@ -46,6 +45,11 @@ final class DownloadEngine: NSObject, URLSessionDownloadDelegate, @unchecked Sen
     func start(fileID: UUID, request: URLRequest, destination: URL) {
         lock.lock()
         destinations[fileID] = destination
+        if let existing = tasks[fileID] {
+            lock.unlock()
+            existing.resume()
+            return
+        }
         let task: URLSessionDownloadTask
         if let resumeData = ResumeStore.read(for: fileID) {
             let usable = ResumeStore.sanitize(resumeData) ?? resumeData
@@ -59,6 +63,18 @@ final class DownloadEngine: NSObject, URLSessionDownloadDelegate, @unchecked Sen
         lock.unlock()
         task.resume()
         continuation.yield(.fileStarted(fileID: fileID, expectedSize: nil))
+    }
+
+    func bind(fileID: UUID, destination: URL) {
+        lock.withLock {
+            destinations[fileID] = destination
+        }
+    }
+
+    func hasTask(fileID: UUID) -> Bool {
+        lock.withLock {
+            tasks[fileID] != nil
+        }
     }
 
     func pause(fileID: UUID) {
@@ -171,11 +187,9 @@ final class DownloadEngine: NSObject, URLSessionDownloadDelegate, @unchecked Sen
                 at: destination.deletingLastPathComponent(),
                 withIntermediateDirectories: true
             )
-            if FileManager.default.fileExists(atPath: destination.path) {
-                try FileManager.default.removeItem(at: destination)
-            }
-            try FileManager.default.moveItem(at: location, to: destination)
-            continuation.yield(.fileCompleted(fileID: id, localURL: destination))
+            let finalDestination = Self.uniqueDestination(for: destination)
+            try FileManager.default.moveItem(at: location, to: finalDestination)
+            continuation.yield(.fileCompleted(fileID: id, localURL: finalDestination))
         } catch let error as NSError {
             if error.code == NSFileWriteOutOfSpaceError {
                 continuation.yield(.fileFailed(fileID: id, error: .diskFull))
@@ -227,13 +241,48 @@ final class DownloadEngine: NSObject, URLSessionDownloadDelegate, @unchecked Sen
         destinations[id] = nil
         lock.unlock()
     }
+
+    func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
+        DispatchQueue.main.async {
+            Self.backgroundCompletionHandler?()
+            Self.backgroundCompletionHandler = nil
+        }
+    }
+
+    private static func uniqueDestination(for url: URL) -> URL {
+        guard FileManager.default.fileExists(atPath: url.path) else { return url }
+        let directory = url.deletingLastPathComponent()
+        let base = url.deletingPathExtension().lastPathComponent
+        let ext = url.pathExtension
+        for index in 1..<10_000 {
+            let name = ext.isEmpty ? "\(base) (\(index))" : "\(base) (\(index)).\(ext)"
+            let candidate = directory.appendingPathComponent(name)
+            if !FileManager.default.fileExists(atPath: candidate.path) {
+                return candidate
+            }
+        }
+        let fallbackName = ext.isEmpty ? "\(base)-\(UUID().uuidString)" : "\(base)-\(UUID().uuidString).\(ext)"
+        return directory.appendingPathComponent(fallbackName)
+    }
 }
 
 extension URLSessionConfiguration {
     static func defaultEngine() -> URLSessionConfiguration {
         let config = URLSessionConfiguration.default
         config.httpMaximumConnectionsPerHost = 6
-        config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForRequest = SettingsStore.shared.connectionTimeoutSeconds
+        config.timeoutIntervalForResource = 60 * 60 * 24
+        config.waitsForConnectivity = true
+        config.allowsCellularAccess = true
+        return config
+    }
+
+    static func backgroundEngine() -> URLSessionConfiguration {
+        let config = URLSessionConfiguration.background(withIdentifier: "app.osm.downloads.engine")
+        config.isDiscretionary = false
+        config.sessionSendsLaunchEvents = true
+        config.httpMaximumConnectionsPerHost = 6
+        config.timeoutIntervalForRequest = SettingsStore.shared.connectionTimeoutSeconds
         config.timeoutIntervalForResource = 60 * 60 * 24
         config.waitsForConnectivity = true
         config.allowsCellularAccess = true

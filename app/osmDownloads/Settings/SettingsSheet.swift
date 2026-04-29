@@ -9,9 +9,15 @@ struct SettingsSheet: View {
     @State private var theme: ThemePreference = .system
     @State private var maxFilesPerJob: Int = 4
     @State private var maxJobs: Int = 3
+    @State private var retryCount: Int = 3
+    @State private var retryBackoff: Double = 2
+    @State private var connectionTimeout: Double = 30
     @State private var maxMbpsString: String = ""
     @State private var destinationPath: String = ""
+    @State private var autoClearHistoryDays: Int = 0
+    @State private var resumeIncompleteOnLaunch: Bool = true
     @State private var hfToken: String = ""
+    @State private var githubToken: String = ""
 
     @State private var loaded: Bool = false
     @State private var saveButtonState: SaveButtonState = .save
@@ -25,7 +31,9 @@ struct SettingsSheet: View {
                 VStack(alignment: .leading, spacing: 22) {
                     appearanceSection
                     downloadsSection
-                    huggingFaceSection
+                    networkSection
+                    authSection
+                    storageSection
                 }
                 .padding(.horizontal, 22)
                 .padding(.vertical, 18)
@@ -38,9 +46,15 @@ struct SettingsSheet: View {
         .onChange(of: theme)             { saveButtonState = .save }
         .onChange(of: maxFilesPerJob)    { saveButtonState = .save }
         .onChange(of: maxJobs)           { saveButtonState = .save }
+        .onChange(of: retryCount)        { saveButtonState = .save }
+        .onChange(of: retryBackoff)      { saveButtonState = .save }
+        .onChange(of: connectionTimeout) { saveButtonState = .save }
         .onChange(of: maxMbpsString)     { saveButtonState = .save }
         .onChange(of: destinationPath)   { saveButtonState = .save }
+        .onChange(of: autoClearHistoryDays) { saveButtonState = .save }
+        .onChange(of: resumeIncompleteOnLaunch) { saveButtonState = .save }
         .onChange(of: hfToken)           { saveButtonState = .save }
+        .onChange(of: githubToken)       { saveButtonState = .save }
     }
 
     // MARK: - Header / footer
@@ -216,6 +230,39 @@ struct SettingsSheet: View {
         }
     }
 
+    private var networkSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            sectionTitle("Network")
+
+            stepperRow(
+                title: "Retry attempts",
+                hint: "Transient network and server failures retry with exponential backoff before the job is marked failed.",
+                value: $retryCount,
+                range: 0...8
+            )
+
+            HStack(spacing: 10) {
+                Text("Retry backoff")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.text)
+                Spacer(minLength: 12)
+                Stepper("\(Self.formatSeconds(retryBackoff))", value: $retryBackoff, in: 1...30, step: 1)
+                    .font(.system(size: 12.5, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Theme.text2)
+            }
+
+            HStack(spacing: 10) {
+                Text("Connection timeout")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.text)
+                Spacer(minLength: 12)
+                Stepper("\(Self.formatSeconds(connectionTimeout))", value: $connectionTimeout, in: 10...120, step: 5)
+                    .font(.system(size: 12.5, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Theme.text2)
+            }
+        }
+    }
+
     private var destinationRow: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Default destination folder")
@@ -250,40 +297,81 @@ struct SettingsSheet: View {
         }
     }
 
-    private var huggingFaceSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("Hugging Face")
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Access token (for gated repos and higher rate limits)")
+    private var authSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionTitle("Auth")
+            tokenRow(
+                title: "Hugging Face token",
+                placeholder: "hf_...",
+                text: $hfToken,
+                linkTitle: "Get Hugging Face token",
+                link: URL(string: "https://huggingface.co/settings/tokens")!
+            )
+            tokenRow(
+                title: "GitHub token",
+                placeholder: "github_pat_...",
+                text: $githubToken,
+                linkTitle: "Create GitHub token",
+                link: URL(string: "https://github.com/settings/tokens")!
+            )
+            Text("Tokens are stored in macOS Keychain and used only for gated/private repos and higher API limits.")
+                .font(.system(size: 11.5))
+                .foregroundStyle(Theme.text3)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func tokenRow(
+        title: String,
+        placeholder: String,
+        text: Binding<String>,
+        linkTitle: String,
+        link: URL
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(title)
                     .font(.system(size: 12.5))
                     .foregroundStyle(Theme.text2)
-
-                SecureField("hf_…", text: $hfToken)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 12.5, design: .monospaced))
-                    .foregroundStyle(Theme.text)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 7)
-                    .background(Theme.surface2)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .stroke(Theme.border, lineWidth: 1)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-
-                HStack(spacing: 8) {
-                    Spacer()
-                    Link("Get a token →",
-                         destination: URL(string: "https://huggingface.co/settings/tokens")!)
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(Theme.info)
-                }
-
-                Text("Tokens are stored in macOS Keychain — never on disk in plain text. Required for Pro / gated repos and recommended for everyone to avoid anonymous rate limits.")
+                Spacer()
+                Link(linkTitle, destination: link)
                     .font(.system(size: 11.5))
-                    .foregroundStyle(Theme.text3)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(Theme.info)
             }
+            SecureField(placeholder, text: text)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12.5, design: .monospaced))
+                .foregroundStyle(Theme.text)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 7)
+                .background(Theme.surface2)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .stroke(Theme.border, lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+    }
+
+    private var storageSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionTitle("Storage")
+            Toggle("Resume incomplete downloads on launch", isOn: $resumeIncompleteOnLaunch)
+                .toggleStyle(.checkbox)
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.text)
+
+            Picker("Auto-clear history older than", selection: $autoClearHistoryDays) {
+                Text("Never").tag(0)
+                Text("30 days").tag(30)
+                Text("90 days").tag(90)
+            }
+            .font(.system(size: 13))
+            .foregroundStyle(Theme.text)
+
+            Text("Auto-clear removes history rows only; downloaded files are never deleted.")
+                .font(.system(size: 11.5))
+                .foregroundStyle(Theme.text3)
         }
     }
 
@@ -321,9 +409,15 @@ struct SettingsSheet: View {
         theme            = settings.themePreference
         maxFilesPerJob   = settings.maxConcurrentFilesPerJob
         maxJobs          = settings.maxConcurrentJobs
+        retryCount       = settings.retryCount
+        retryBackoff     = settings.retryBackoffSeconds
+        connectionTimeout = settings.connectionTimeoutSeconds
         maxMbpsString    = settings.maxDownloadMbps > 0 ? Self.formatMbps(settings.maxDownloadMbps) : ""
         destinationPath  = settings.destinationFolderPath
+        autoClearHistoryDays = settings.autoClearHistoryDays
+        resumeIncompleteOnLaunch = settings.resumeIncompleteOnLaunch
         hfToken          = KeychainService.get(.huggingFace) ?? ""
+        githubToken      = KeychainService.get(.github) ?? ""
         loaded           = true
         saveButtonState  = .save
     }
@@ -346,14 +440,25 @@ struct SettingsSheet: View {
         settings.themePreference          = theme
         settings.maxConcurrentFilesPerJob = maxFilesPerJob
         settings.maxConcurrentJobs        = maxJobs
+        settings.retryCount               = retryCount
+        settings.retryBackoffSeconds      = retryBackoff
+        settings.connectionTimeoutSeconds = connectionTimeout
         settings.maxDownloadMbps          = Self.parseMbps(maxMbpsString)
         settings.destinationFolderPath    = destinationPath
+        settings.autoClearHistoryDays     = autoClearHistoryDays
+        settings.resumeIncompleteOnLaunch = resumeIncompleteOnLaunch
 
         let trimmedToken = hfToken.trimmingCharacters(in: .whitespaces)
         if trimmedToken.isEmpty {
             KeychainService.delete(.huggingFace)
         } else {
             KeychainService.set(trimmedToken, account: .huggingFace)
+        }
+        let trimmedGitHubToken = githubToken.trimmingCharacters(in: .whitespaces)
+        if trimmedGitHubToken.isEmpty {
+            KeychainService.delete(.github)
+        } else {
+            KeychainService.set(trimmedGitHubToken, account: .github)
         }
     }
 
@@ -366,5 +471,9 @@ struct SettingsSheet: View {
     private static func formatMbps(_ d: Double) -> String {
         if d == d.rounded() { return "\(Int(d))" }
         return String(format: "%.1f", d)
+    }
+
+    private static func formatSeconds(_ d: Double) -> String {
+        "\(Int(d.rounded())) s"
     }
 }

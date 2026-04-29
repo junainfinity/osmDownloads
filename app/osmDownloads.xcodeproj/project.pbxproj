@@ -23,6 +23,7 @@
 		49F92A0231A3478FD2D0401D /* GenericResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD9FC1EDF71002C45E763E52 /* GenericResolver.swift */; };
 		52B1F084FE4EB97118C23075 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9066277A6E90F4FAFC8FCF28 /* Models.swift */; };
 		531EEA145D0633DB343CF688 /* FileRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 137309438E97678814E64590 /* FileRow.swift */; };
+		56B2A2E3103B4C6B9F520001 /* GitHubResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56B2A2E2103B4C6B9F520001 /* GitHubResolverTests.swift */; };
 		59A7EAE244BA3632A6E4DFC8 /* NewDownloadBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5FB4AF71A1CCC6D16EF15F5 /* NewDownloadBar.swift */; };
 		5B2B00BBF14D0E39E78E0601 /* AppViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94867659F8BC2B2213A6C8ED /* AppViewModel.swift */; };
 		5FCC0A86170F9E7B8131BF54 /* URLClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 252399E21D65A4E098EC900E /* URLClassifier.swift */; };
@@ -77,6 +78,7 @@
 		482ED8FA64D677EBEC2DF536 /* AppPaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPaths.swift; sourceTree = "<group>"; };
 		54E70406447E56A9FD31759F /* SpeedEstimatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedEstimatorTests.swift; sourceTree = "<group>"; };
 		55DCB50E9F978B3A9B85D820 /* osmDownloadsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = osmDownloadsApp.swift; sourceTree = "<group>"; };
+		56B2A2E2103B4C6B9F520001 /* GitHubResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubResolverTests.swift; sourceTree = "<group>"; };
 		5FB5D2D60AA1100FBA0E6111 /* GitHubResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubResolver.swift; sourceTree = "<group>"; };
 		65BFE8BD57CA66E2EDDF9075 /* osmDownloads.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = osmDownloads.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		70F4A3422D47EE26AD602866 /* ProgressBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressBar.swift; sourceTree = "<group>"; };
@@ -109,6 +111,7 @@
 			isa = PBXGroup;
 			children = (
 				ECFCA8AE4C464B653D97ABB8 /* GenericResolverTests.swift */,
+				56B2A2E2103B4C6B9F520001 /* GitHubResolverTests.swift */,
 				01E80C03B2A09C511C325805 /* HuggingFaceResolverTests.swift */,
 				54E70406447E56A9FD31759F /* SpeedEstimatorTests.swift */,
 				B29CE93BF998CCD5B3599B43 /* URLClassifierTests.swift */,
@@ -352,6 +355,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				7B95AFC77452B772EF6DFC01 /* GenericResolverTests.swift in Sources */,
+				56B2A2E3103B4C6B9F520001 /* GitHubResolverTests.swift in Sources */,
 				601A9AE9E15AD09B59C53491 /* HuggingFaceResolverTests.swift in Sources */,
 				B8F63DF004BF91A418F4AF58 /* SpeedEstimatorTests.swift in Sources */,
 				F428B9BA6D034F70E27730C9 /* URLClassifierTests.swift in Sources */,
@@ -509,6 +513,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = osmDownloads/osmDownloads.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = osmDownloads;
@@ -530,6 +535,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = osmDownloads/osmDownloads.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = osmDownloads;

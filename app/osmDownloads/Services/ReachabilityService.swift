@@ -1,7 +1,6 @@
 import Foundation
 import Network
 
-// TODO: M4 — drive auto-resume on connectivity changes.
 actor ReachabilityService {
     static let shared = ReachabilityService()
 

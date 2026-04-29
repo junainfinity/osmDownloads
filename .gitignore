@@ -23,3 +23,9 @@ Package.resolved
 # Misc
 .env
 *.log
+
+# Local packaged app copies
+/osmDownloads.app/
+/osmDownloads.app.zip
+/app/osmDownloads.app/
+/handoff/CODEX_TAKEOVER.md

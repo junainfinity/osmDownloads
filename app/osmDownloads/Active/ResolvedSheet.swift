@@ -16,6 +16,8 @@ struct ResolvedSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             head
             Divider().background(Theme.border)
+            destinationBar
+            Divider().background(Theme.border)
             if manifest.files.count > 6 {
                 searchBar
                 Divider().background(Theme.border)
@@ -135,6 +137,7 @@ struct ResolvedSheet: View {
             }
         }
         .frame(maxHeight: 280)
+        .frame(height: fileListHeight)
     }
 
     private func fileRow(_ file: RemoteFile) -> some View {
@@ -190,37 +193,65 @@ struct ResolvedSheet: View {
             Text(summary)
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.text2)
-
-            destinationChip
+                .lineLimit(1)
 
             Spacer(minLength: 0)
             Button("Start download", action: onStart)
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(selected.isEmpty)
         }
+        .frame(minHeight: 34)
         .padding(12)
     }
 
-    private var destinationChip: some View {
+    private var destinationBar: some View {
         Button(action: onChooseDestination) {
-            HStack(spacing: 5) {
-                Icon(icon: .folder, size: 11, color: Theme.text3)
-                Text(destPath)
-                    .font(.system(size: 11.5, design: .monospaced))
-                    .foregroundStyle(Theme.text3)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+            HStack(spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(Theme.surface)
+                    Icon(icon: .folder, size: 13, color: Theme.text2)
+                }
+                .frame(width: 30, height: 30)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Download to")
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundStyle(Theme.text3)
+                    Text(destPath)
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(Theme.text2)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+
+                Spacer(minLength: 8)
+
+                Text("Choose folder")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.text2)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Theme.surface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(Theme.border, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             }
-            .padding(.horizontal, 9)
-            .padding(.vertical, 4)
+            .padding(10)
+            .frame(height: 52)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(Theme.surface2)
             .overlay(
-                Capsule().stroke(Theme.border, lineWidth: 1)
+                RoundedRectangle(cornerRadius: Theme.radiusSm, style: .continuous)
+                    .stroke(Theme.border, lineWidth: 1)
             )
-            .clipShape(Capsule())
+            .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSm, style: .continuous))
         }
         .buttonStyle(.plain)
-        .help("Click to choose a different folder")
+        .padding(12)
+        .help("Choose a different folder for this download")
     }
 
     private var summary: String {
@@ -241,5 +272,10 @@ struct ResolvedSheet: View {
             return "~" + full.dropFirst(home.count)
         }
         return full
+    }
+
+    private var fileListHeight: CGFloat {
+        let visibleRows = min(max(manifest.files.count, 1), 7)
+        return CGFloat(visibleRows) * 36
     }
 }

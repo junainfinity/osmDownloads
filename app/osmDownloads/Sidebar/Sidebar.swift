@@ -145,8 +145,7 @@ private struct SourceRow: View {
     var body: some View {
         let active = appVM.sourceFilter == filter
         Button {
-            // Toggle: clicking the active filter resets to .all.
-            appVM.sourceFilter = (active && filter != .all) ? .all : filter
+            appVM.selectSourceFilter(filter)
         } label: {
             HStack(spacing: 9) {
                 if let glyph {

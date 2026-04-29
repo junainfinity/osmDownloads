@@ -35,6 +35,8 @@ struct ActiveView: View {
             .padding(.bottom, 80)
         }
         .background(Theme.bg)
+        .onAppear(perform: consumeIncomingURL)
+        .onChange(of: appVM.incomingURLString) { _, _ in consumeIncomingURL() }
     }
 
     private var activeJobs: [Job] {
@@ -97,5 +99,10 @@ struct ActiveView: View {
                 .frame(maxWidth: 380)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private func consumeIncomingURL() {
+        guard let value = appVM.consumeIncomingURLString() else { return }
+        resolveVM.urlString = value
     }
 }

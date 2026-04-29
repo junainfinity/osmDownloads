@@ -23,7 +23,7 @@ enum AppIcon: String {
     case globe      = "globe"
     case refresh    = "arrow.clockwise"
     case trash      = "trash"
-    case github     = "chevron.left.forwardslash.chevron.right"
+    case sidebar    = "sidebar.left"
 }
 
 /// Lightweight SF Symbols wrapper. Pass a size and tint; falls back to text2.
@@ -40,29 +40,6 @@ struct Icon: View {
     }
 }
 
-/// Hugging Face glyph: yellow nucleus + 2 rotated warm strokes. Approximation of
-/// the SVG in the prototype's icons.jsx.
-struct HuggingFaceGlyph: View {
-    var size: CGFloat = 16
-
-    var body: some View {
-        ZStack {
-            Capsule()
-                .stroke(Theme.text, lineWidth: max(1, size * 0.06))
-                .frame(width: size * 0.95, height: size * 0.55)
-                .rotationEffect(.degrees(-20))
-            Capsule()
-                .stroke(Theme.text, lineWidth: max(1, size * 0.06))
-                .frame(width: size * 0.95, height: size * 0.55)
-                .rotationEffect(.degrees(20))
-            Circle()
-                .fill(Theme.accent)
-                .frame(width: size * 0.5, height: size * 0.5)
-        }
-        .frame(width: size, height: size)
-    }
-}
-
 /// Source-aware icon used in cards and lists.
 struct SourceIcon: View {
     let source: Source
@@ -71,9 +48,19 @@ struct SourceIcon: View {
     var body: some View {
         switch source {
         case .huggingFace:
-            HuggingFaceGlyph(size: size)
+            Image("SourceHuggingFace")
+                .resizable()
+                .interpolation(.high)
+                .scaledToFit()
+                .frame(width: size, height: size)
+                .accessibilityLabel("Hugging Face")
         case .github:
-            Icon(icon: .github, size: size, weight: .semibold, color: Theme.text)
+            Image("SourceGitHub")
+                .resizable()
+                .interpolation(.high)
+                .scaledToFit()
+                .frame(width: size, height: size)
+                .accessibilityLabel("GitHub")
         case .generic:
             Icon(icon: .globe, size: size, color: Theme.text2)
         }

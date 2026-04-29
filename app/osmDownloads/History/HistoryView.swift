@@ -1,17 +1,11 @@
 import SwiftData
 import SwiftUI
 
-enum HistoryFilter: String, CaseIterable {
-    case all, completed, failed
-    var label: String { rawValue.capitalized }
-}
-
 struct HistoryView: View {
     @Environment(JobsViewModel.self) private var jobs
     @Environment(AppViewModel.self) private var appVM
 
     @Query(sort: [SortDescriptor(\Job.completedAt, order: .reverse)]) private var allJobs: [Job]
-    @State private var filter: HistoryFilter = .all
 
     var body: some View {
         ScrollView {
@@ -55,7 +49,7 @@ struct HistoryView: View {
 
     private var filteredJobs: [Job] {
         let base: [Job]
-        switch filter {
+        switch appVM.historyFilter {
         case .all:       base = historyJobs
         case .completed: base = historyJobs.filter { $0.status == .completed }
         case .failed:    base = historyJobs.filter { $0.status == .failed || $0.status == .canceled }
@@ -70,7 +64,7 @@ struct HistoryView: View {
     private var toolbar: some View {
         @Bindable var appVMBinding = appVM
         return HStack(spacing: 10) {
-            Picker("", selection: $filter) {
+            Picker("", selection: $appVMBinding.historyFilter) {
                 ForEach(HistoryFilter.allCases, id: \.self) { f in
                     Text(f.label).tag(f)
                 }
